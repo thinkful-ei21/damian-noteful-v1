@@ -3,7 +3,6 @@
 // Load array of notes
 // const data = require('./db/notes');
 
-console.log('Hello Noteful!');
 
 // EXPRESS APP CODE
 
@@ -13,11 +12,15 @@ const data = require('./db/notes');
 
 const app = express();
 
+const morgan = require('morgan');
+
 // DB
 
 const { PORT } = require('./config');
 
 const {requestLogger} = require('./middleware/logger');
+
+const notesRouter = require('./router/notes.router');
 
 const simDB = require('./db/simDB');
 
@@ -26,8 +29,20 @@ const notes = simDB.initialize(data);
 // STATIC SERVER
 
 app.use(express.static('public'));
-app.use(requestLogger);
+
+app.use(morgan('dev'));
+
 app.use(express.json());
+
+app.use('/api', notesRouter);
+
+//404
+
+app.use(function (req, res, next) {
+  const err = new Error('Not Found');
+  err.status = 404;
+  next(err);
+});
 
 
 
@@ -86,28 +101,35 @@ app.get('/api/notes', (req, res, next) => {
   });
 });
 
-
-app.get('/boom', (req, res, next) => {
-  throw new Error('Boom!!');
-});
-
-app.use(function (req, res, next) {
-  var err = new Error('Not Found');
-  err.status = 404;
-  res.status(404).json({ message: 'Not Found' });
-});
-
+//  Error handler
 app.use(function (err, req, res, next) {
   res.status(err.status || 500);
   res.json({
     message: err.message,
-    error: err
+    error: app.get('env') === 'development' ? err : {}
   });
 });
 
+app.startServer = function (port) {
+  return new Promise((resolve, reject) => {
+    this.listen(port, function () {
+      this.stopServer = require('util').promisify(this.close);
+      resolve(this);
+    }).on('error', reject);
+  });
+};
 
-app.listen(8080, function () {
-    console.info(`Server listening on ${this.address().port}`);
-}).on('error', err => {
+// Listen for incoming connections
+
+if (require.main === module) {
+  app.startServer(PORT).catch(err => {
+    if (err.code === 'EADDRINUSE') {
+      const stars = '*'.repeat(80);
+      console.error(`${stars}\nEADDRINUSE (Error Address In Use). Please stop other web servers using port ${PORT}\n${stars}`);
+    }
     console.error(err);
-});
+  });
+}
+
+module.exports = app; // Export for testing
+

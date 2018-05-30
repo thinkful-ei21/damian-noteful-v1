@@ -1,12 +1,7 @@
-/* global $ noteful api store */
+/* global $ noteful */
 'use strict';
 
 $(document).ready(function () {
   noteful.bindEventListeners();
-
-  api.search({}, response => {
-    store.notes = response;
-    noteful.render();
-  });
-
+  noteful.doSearchAndRender();
 });
